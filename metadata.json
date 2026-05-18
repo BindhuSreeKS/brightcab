@@ -1,0 +1,8 @@
+{
+  "name": "CabEcho - Enterprise Cab Booking Ecosystem",
+  "description": "A comprehensive multi-role dashboard for managing cab booking operations, drivers, customers, and platform settings.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": []
+}
