@@ -4,6 +4,7 @@ import mongoose from "mongoose";
 import cors from "cors";
 import dotenv from "dotenv";
 import path from "path";
+import http from "http";
 import { fileURLToPath } from "url";
 import { User, Ride, SystemLog } from "./src/models.js";
 
@@ -14,7 +15,7 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT ? parseInt(process.env.PORT) : 4000;
 
   // MongoDB Connection
   const MONGODB_URI = process.env.MONGODB_URI;
@@ -96,6 +97,29 @@ async function startServer() {
     } catch (err) {
       res.status(500).json({ error: "Failed to fetch monitoring data" });
     }
+  });
+
+  // Proxy unmatched API requests to Spring Boot backend
+  app.use("/api", (req, res) => {
+    const targetUrl = `http://localhost:8080${req.originalUrl}`;
+    const proxyReq = http.request(
+      targetUrl,
+      {
+        method: req.method,
+        headers: req.headers,
+      },
+      (proxyRes) => {
+        res.writeHead(proxyRes.statusCode || 500, proxyRes.headers);
+        proxyRes.pipe(res, { end: true });
+      }
+    );
+
+    proxyReq.on("error", (err) => {
+      console.error("Proxy error:", err);
+      res.status(502).json({ error: "Bad Gateway (Backend might be offline)" });
+    });
+
+    req.pipe(proxyReq, { end: true });
   });
 
   // Vite middleware for development

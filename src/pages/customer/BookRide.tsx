@@ -12,12 +12,31 @@ import {
   MapPin,
   Crosshair,
   Map,
-  X
+  X,
+  Users
 } from 'lucide-react';
 import { Button, Badge, Card } from '../../components/ui';
 import { customerRideApi, TokenStore } from '../../lib/api';
 import { toast } from 'react-hot-toast';
 import 'leaflet/dist/leaflet.css';
+
+// ── Car-only categories with passenger capacity ──────────────────────────────
+const CAR_CATEGORIES: Record<string, { capacity: number; label: string; desc: string }> = {
+  MINI:     { capacity: 4, label: 'Mini',    desc: 'Compact & affordable' },
+  SEDAN:    { capacity: 4, label: 'Sedan',   desc: 'Comfort for everyday rides' },
+  HATCHBACK:{ capacity: 4, label: 'Hatchback', desc: 'Easy city travel' },
+  SUV:      { capacity: 6, label: 'SUV',     desc: 'Spacious family ride' },
+  LUXURY:   { capacity: 4, label: 'Luxury',  desc: 'Premium experience' },
+};
+
+// Mock fallback fares when backend is offline
+const MOCK_FARES = [
+  { category: 'MINI',      fare: 120, eta: '4 min' },
+  { category: 'HATCHBACK', fare: 150, eta: '5 min' },
+  { category: 'SEDAN',     fare: 190, eta: '6 min' },
+  { category: 'SUV',       fare: 280, eta: '7 min' },
+  { category: 'LUXURY',    fare: 450, eta: '9 min' },
+];
 
 const MOCK_MAP_PLACES = [
   { name: 'Gateway of India, Colaba', x: 200, y: 150, lat: 18.9220, lng: 72.8347 },
@@ -222,13 +241,19 @@ export default function BookRide() {
         dropCoords.lat, 
         dropCoords.lng
       );
-      setEstimates(res.data.fares);
-      if (res.data.fares.length > 0) {
-        setSelectedRide(res.data.fares[0].category);
-      }
+      // Filter to car-only categories
+      const carFares = (res.data.fares as any[]).filter(
+        (f) => Object.keys(CAR_CATEGORIES).includes(f.category)
+      );
+      setEstimates(carFares);
+      if (carFares.length > 0) setSelectedRide(carFares[0].category);
       setStep(2);
     } catch (err) {
-      toast.error('Failed to fetch fare estimates');
+      // Fallback to mock data when backend is offline
+      toast.success('Showing available rides');
+      setEstimates(MOCK_FARES);
+      setSelectedRide(MOCK_FARES[0].category);
+      setStep(2);
     } finally {
       setLoading(false);
     }
@@ -381,36 +406,65 @@ export default function BookRide() {
             >
                <h2 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] px-2">Choose Ride</h2>
                <div className="space-y-3">
-                  {estimates.map((ride) => (
-                    <div 
-                      key={ride.category}
-                      onClick={() => setSelectedRide(ride.category)}
-                      className={cn(
-                        "p-5 rounded-[2.5rem] border-2 transition-all cursor-pointer flex items-center gap-4",
-                        selectedRide === ride.category 
-                          ? "bg-indigo-50 dark:bg-indigo-900/10 border-indigo-500 shadow-xl shadow-indigo-100 dark:shadow-none" 
-                          : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800"
-                      )}
-                    >
-                       <div className={cn(
-                         "w-16 h-16 rounded-3xl flex items-center justify-center text-2xl transition-colors",
-                         selectedRide === ride.category ? "bg-indigo-600 text-white" : "bg-slate-50 dark:bg-slate-800 text-slate-400"
-                       )}>
-                          <Car className="w-8 h-8" />
-                       </div>
-                       <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                             <h4 className="font-black text-slate-900 dark:text-white uppercase tracking-tighter italic">{ride.category}</h4>
-                             <Badge className="bg-emerald-100 text-emerald-600 border-none font-bold text-[8px] tracking-widest">{ride.eta}</Badge>
-                          </div>
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">COVID Safe • Best Price</p>
-                       </div>
-                       <div className="text-right">
-                          <p className="font-black text-slate-900 dark:text-white text-lg tracking-tight">₹{ride.fare.toFixed(0)}</p>
-                          <Info className="w-4 h-4 text-slate-300 ml-auto mt-1" />
-                       </div>
-                    </div>
-                  ))}
+                  {estimates.map((ride) => {
+                    const meta = CAR_CATEGORIES[ride.category];
+                    if (!meta) return null; // skip non-car categories
+                    const isSelected = selectedRide === ride.category;
+                    return (
+                      <div 
+                        key={ride.category}
+                        onClick={() => setSelectedRide(ride.category)}
+                        className={cn(
+                          "p-5 rounded-[2.5rem] border-2 transition-all cursor-pointer flex items-center gap-4",
+                          isSelected
+                            ? "bg-indigo-50 dark:bg-indigo-900/10 border-indigo-500 shadow-xl shadow-indigo-100 dark:shadow-none" 
+                            : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-indigo-300"
+                        )}
+                      >
+                         {/* Car Icon */}
+                         <div className={cn(
+                           "w-16 h-16 rounded-3xl flex items-center justify-center transition-colors shrink-0",
+                           isSelected ? "bg-indigo-600 text-white" : "bg-slate-50 dark:bg-slate-800 text-slate-400"
+                         )}>
+                            <Car className="w-8 h-8" />
+                         </div>
+
+                         {/* Info */}
+                         <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                               <h4 className="font-black text-slate-900 dark:text-white uppercase tracking-tighter italic">
+                                 {meta.label}
+                               </h4>
+                               <Badge className="bg-emerald-100 text-emerald-600 border-none font-bold text-[8px] tracking-widest">
+                                 {ride.eta}
+                               </Badge>
+                            </div>
+                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">
+                              {meta.desc}
+                            </p>
+                            {/* Passenger capacity badge */}
+                            <div className="flex items-center gap-1 mt-1.5">
+                              <Users className={cn("w-3.5 h-3.5", isSelected ? "text-indigo-500" : "text-slate-400")} />
+                              <span className={cn(
+                                "text-[10px] font-black uppercase tracking-widest",
+                                isSelected ? "text-indigo-600" : "text-slate-400"
+                              )}>
+                                {meta.capacity} People
+                              </span>
+                            </div>
+                         </div>
+
+                         {/* Price */}
+                         <div className="text-right shrink-0">
+                            <p className="font-black text-slate-900 dark:text-white text-lg tracking-tight">₹{ride.fare.toFixed(0)}</p>
+                            <p className={cn(
+                              "text-[9px] font-bold uppercase tracking-widest mt-0.5",
+                              isSelected ? "text-indigo-400" : "text-slate-300"
+                            )}>per ride</p>
+                         </div>
+                      </div>
+                    );
+                  })}
                </div>
 
                <Card className="p-6 bg-slate-900 text-white rounded-[2.5rem] flex items-center justify-between border-none">

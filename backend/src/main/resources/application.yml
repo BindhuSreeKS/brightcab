@@ -51,3 +51,29 @@ management:
   endpoint:
     health:
       show-details: always
+
+# ── WhatsApp API (AiSensy via bgsinfotech reseller) ───────────────────────────
+aisensy:
+  api-key:          ${AISENSY_API_KEY:b712de2d74a1e7a3692c0}
+  project-api-key:  ${AISENSY_API_KEY:b712de2d74a1e7a3692c0}
+  campaign-name:    ${AISENSY_CAMPAIGN_NAME:Vazra mobility}
+  user-name:        ${AISENSY_USER_NAME:Vazra mobility}
+  whatsapp-number:  ${AISENSY_WHATSAPP_NUMBER:919035999800}
+  webhook-url:      ${AISENSY_WEBHOOK_URL:https://localhost:8080/api/webhook/whatsapp}
+  message-api-url:  ${AISENSY_MESSAGE_API_URL:https://messages.bgsinfotech.com/messages/whatsapp}
+
+# ── Google Maps API ────────────────────────────────────────────────────────────
+google:
+  maps:
+    api-key: ${GOOGLE_MAPS_API_KEY:YOUR_GOOGLE_MAPS_API_KEY}
+  gemini:
+    api-key: ${GEMINI_API_KEY:YOUR_GEMINI_API_KEY}
+
+# ── Cab Fare & Matching Config ─────────────────────────────────────────────────
+cab:
+  fare:
+    base: 50.0
+    per-km: 12.0
+    per-minute: 1.0
+  matching:
+    radius-km: 10.0

@@ -43,7 +43,7 @@ public class Ride {
     private Double fare; // Final fare
     
     private Double distance; // in km
-    private Integer duration; // in minutes
+    private Double duration; // in minutes
     
     private PaymentMethod paymentMethod; // CASH, WALLET, UPI, CARD
     private String paymentStatus; // PENDING, PAID, FAILED
@@ -65,4 +65,8 @@ public class Ride {
     
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    private String customerWhatsappPhone; // for WhatsApp notifications
+    private String driverPhone;           // driver's phone for WhatsApp
+    private String driverVehicleNumber;   // convenience field
 }

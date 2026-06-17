@@ -82,6 +82,11 @@ public class Driver {
 
     private Double longitude;
 
+    @Builder.Default
+    private Boolean availableForRide = true; // within ONLINE status, is driver free?
+
+    private String whatsappPhone; // driver's WhatsApp (defaults to phone)
+
     @CreatedDate
     private LocalDateTime createdAt;
 

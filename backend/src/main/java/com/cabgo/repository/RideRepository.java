@@ -30,4 +30,8 @@ public interface RideRepository extends MongoRepository<Ride, String> {
     
     @Query("{ createdAt: { $gte: ?0, $lte: ?1 } }")
     List<Ride> findByDateRange(LocalDateTime from, LocalDateTime to);
+
+    List<Ride> findByCustomerWhatsappPhone(String whatsappPhone);
+
+    Optional<Ride> findFirstByCustomerWhatsappPhoneAndStatusInOrderByBookingTimeDesc(String whatsappPhone, List<RideStatus> statuses);
 }

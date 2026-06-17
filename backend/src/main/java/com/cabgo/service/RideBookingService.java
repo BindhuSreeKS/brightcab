@@ -24,17 +24,18 @@ import java.util.stream.Collectors;
 public class RideBookingService {
 
     private final RideRepository rideRepository;
+    private final GoogleMapsService googleMapsService;
     
     public FareEstimationResponse getFareEstimation(Double pLat, Double pLog, Double dLat, Double dLog) {
-        // Simulate distance calculation (random between 2km and 20km)
-        double distance = 2.0 + (new Random().nextDouble() * 18.0);
-        int duration = (int) (distance * 3); // 3 mins per km
+        GoogleMapsService.DistanceResult route = googleMapsService.getDistance(pLat, pLog, dLat, dLog);
+        double distance = route.distanceKm();
+        int duration = route.durationMinutes();
 
         List<FareEstimationResponse.VehicleFare> fares = Arrays.stream(VehicleCategory.values())
                 .map(category -> FareEstimationResponse.VehicleFare.builder()
                         .category(category)
                         .fare(calculateFare(category, distance))
-                        .eta(new Random().nextInt(10) + 1 + " mins")
+                        .eta(route.durationText())
                         .build())
                 .collect(Collectors.toList());
 
@@ -56,8 +57,12 @@ public class RideBookingService {
                     throw new BadRequestException("You already have an active ride");
                 });
 
-        // Calculate fare for booking
-        double distance = 5.0; // Simulate or fetch from map service
+        // Calculate fare for booking using Google Maps
+        GoogleMapsService.DistanceResult route = googleMapsService.getDistance(
+                request.getPickupLatitude(), request.getPickupLongitude(),
+                request.getDropLatitude(), request.getDropLongitude()
+        );
+        double distance = route.distanceKm();
         double fare = calculateFare(request.getVehicleCategory(), distance);
 
         Ride ride = Ride.builder()
@@ -70,12 +75,16 @@ public class RideBookingService {
                 .dropLongitude(request.getDropLongitude())
                 .vehicleCategory(request.getVehicleCategory())
                 .status(RideStatus.SEARCHING)
+                .distance(distance)
+                .duration(route.durationMinutes())
                 .estimatedFare(fare)
+                .fare(fare)
                 .paymentMethod(request.getPaymentMethod())
                 .paymentStatus("PENDING")
                 .bookingTime(LocalDateTime.now())
                 .otp(String.format("%04d", new Random().nextInt(10000)))
                 .build();
+
 
         return rideRepository.save(ride);
     }
@@ -104,17 +113,21 @@ public class RideBookingService {
     private double calculateFare(VehicleCategory category, double distance) {
         double baseFare = switch (category) {
             case MINI -> 40.0;
+            case HATCHBACK -> 45.0;
             case SEDAN -> 80.0;
             case SUV -> 120.0;
             case BIKE -> 20.0;
             case AUTO -> 30.0;
+            case LUXURY -> 150.0;
         };
         double perKmRate = switch (category) {
             case MINI -> 10.0;
+            case HATCHBACK -> 11.0;
             case SEDAN -> 15.0;
             case SUV -> 20.0;
             case BIKE -> 5.0;
             case AUTO -> 8.0;
+            case LUXURY -> 25.0;
         };
         return baseFare + (distance * perKmRate);
     }

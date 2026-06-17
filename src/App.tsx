@@ -14,9 +14,12 @@ import AdminDashboard from './pages/admin/Dashboard';
 import DriverManagement from './pages/admin/Drivers';
 import CustomerManagement from './pages/admin/Customers';
 import RideManagement from './pages/admin/Rides';
-import LiveTracking from './pages/admin/Tracking';
+import LiveTracking from './pages/admin/LiveTracking';
+import WhatsAppBot from './pages/admin/WhatsAppBot';
 import PaymentManagement from './pages/admin/Payments';
 import ComplaintManagement from './pages/admin/Complaints';
+import NotificationManagement from './pages/admin/Notifications';
+import ReportsAnalytics from './pages/admin/Reports';
 
 // Driver Onboarding Pages
 import OnboardingOverview from './pages/admin/onboarding/Overview';
@@ -41,9 +44,7 @@ import SecurityMonitoring from './pages/superadmin/Security';
 import PlatformSettings from './pages/superadmin/Settings';
 import SettingsPage from './pages/Settings';
 
-// Placeholders
-const NotificationManagement = () => <div className="p-6 text-slate-600 dark:text-slate-400">Notification Management — Coming Soon</div>;
-const ReportsAnalytics = () => <div className="p-6 text-slate-600 dark:text-slate-400">Reports & Analytics — Coming Soon</div>;
+
 
 // Driver Pages
 import DriverDashboard from './pages/driver/Dashboard';
@@ -100,6 +101,7 @@ export default function App() {
             <Route path="/admin/customers" element={<DashboardLayout role="ADMIN"><CustomerManagement /></DashboardLayout>} />
             <Route path="/admin/rides" element={<DashboardLayout role="ADMIN"><RideManagement /></DashboardLayout>} />
             <Route path="/admin/tracking" element={<DashboardLayout role="ADMIN"><LiveTracking /></DashboardLayout>} />
+            <Route path="/admin/whatsapp-bot" element={<DashboardLayout role="ADMIN"><WhatsAppBot /></DashboardLayout>} />
             <Route path="/admin/payments" element={<DashboardLayout role="ADMIN"><PaymentManagement /></DashboardLayout>} />
             <Route path="/admin/complaints" element={<DashboardLayout role="ADMIN"><ComplaintManagement /></DashboardLayout>} />
             <Route path="/admin/notifications" element={<DashboardLayout role="ADMIN"><NotificationManagement /></DashboardLayout>} />

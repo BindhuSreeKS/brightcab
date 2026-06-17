@@ -9,10 +9,17 @@ import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
 public interface DriverRepository extends MongoRepository<Driver, String> {
+
+    List<Driver> findByStatusAndVerificationStatus(DriverStatus status, VerificationStatus verificationStatus);
+
+    List<Driver> findByStatus(DriverStatus status);
+
+    Optional<Driver> findByWhatsappPhone(String whatsappPhone);
 
     Optional<Driver> findByEmail(String email);
 

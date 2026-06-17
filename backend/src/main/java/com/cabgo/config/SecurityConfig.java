@@ -46,6 +46,12 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/webhook/**").permitAll()
+                .requestMatchers("/ws/**").permitAll()
+                .requestMatchers("/tracking/**").permitAll()
+                .requestMatchers("/rides/*/track").permitAll()
+                .requestMatchers("/aisensy/**").permitAll()
+                .requestMatchers("/integration/aisensy/**").permitAll()
                 .requestMatchers("/customer/auth/**").permitAll()
                 .requestMatchers("/driver/auth/**").permitAll()
                 .requestMatchers("/auth/**").permitAll()

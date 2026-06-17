@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Users, UserCheck, Car, Map, CreditCard,
   AlertCircle, Bell, Settings, PieChart, ShieldCheck,
   Globe, DollarSign, Megaphone, History, ChevronRight,
-  Menu, LogOut, Search, User as UserIcon, Sun, Moon, Loader2
+  Menu, LogOut, Search, User as UserIcon, Sun, Moon, Loader2, MessageSquare
 } from 'lucide-react';
 import { cn } from '../lib/utils';
 import { Button } from './ui';
@@ -40,6 +40,7 @@ const ADMIN_NAV_ITEMS: (NavItem | { label: string; icon: React.ElementType; subI
   { label: 'Customers', href: '/admin/customers', icon: Users },
   { label: 'Rides', href: '/admin/rides', icon: Car },
   { label: 'Live Tracking', href: '/admin/tracking', icon: Map },
+  { label: 'WhatsApp Bot', href: '/admin/whatsapp-bot', icon: MessageSquare },
   { label: 'Payments', href: '/admin/payments', icon: CreditCard },
   { label: 'Complaints', href: '/admin/complaints', icon: AlertCircle },
   { label: 'Notifications', href: '/admin/notifications', icon: Bell },

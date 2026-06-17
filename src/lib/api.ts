@@ -457,3 +457,33 @@ export const customerSafetyApi = {
   triggerSos: (payload: { rideId?: string; latitude: number; longitude: number }) =>
     apiFetch<any>('/customer/safety/sos', { method: 'POST', body: JSON.stringify(payload) }),
 };
+
+// ─── WhatsApp Bot API ────────────────────────────────────────────────────────
+export const whatsappBotApi = {
+  getSessions: () => apiFetch<any[]>('/admin/whatsapp/sessions'),
+  getStats: () => apiFetch<any>('/admin/whatsapp/stats'),
+  sendMessage: (toPhone: string, message: string) =>
+    apiFetch<void>(`/admin/whatsapp/send?toPhone=${encodeURIComponent(toPhone)}&message=${encodeURIComponent(message)}`, {
+      method: 'POST'
+    }),
+  resetSession: (phone: string) =>
+    apiFetch<void>(`/admin/whatsapp/sessions/${phone}/reset`, {
+      method: 'POST'
+    })
+};
+
+// ─── Ride Tracking API ───────────────────────────────────────────────────────
+export const rideTrackingApi = {
+  /** GET /rides/{rideId}/track – returns RideTracking document */
+  getTracking: (rideId: string) => apiFetch<any>(`/rides/${rideId}/track`),
+};
+
+// ─── Driver Location API (authenticated driver calls) ────────────────────────
+export const driverLocationApi = {
+  /** POST /driver/location/update – heartbeat + live location push */
+  updateLocation: (payload: { latitude: number; longitude: number; rideId?: string }) =>
+    apiFetch<void>('/driver/location/update', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+};

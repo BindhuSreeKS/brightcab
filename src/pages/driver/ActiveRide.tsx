@@ -1,20 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  MapPin, 
-  Navigation, 
-  Phone, 
-  MessageCircle, 
+import React, { useState, useEffect, useRef } from 'react';
+import {
+  Navigation,
+  Phone,
+  MessageCircle,
   AlertTriangle,
-  ChevronUp,
   Clock,
   Shield,
   CheckCircle2,
-  XCircle,
   MoreVertical,
-  Flag
+  Flag,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Button, Badge, Card, CardContent } from '../../components/ui';
+import { Button, Badge } from '../../components/ui';
+import DriverTracking from '../../components/DriverTracking';
 import { useNavigate } from 'react-router-dom';
 import { driverRideApi, driverSafetyApi } from '../../lib/api';
 import toast from 'react-hot-toast';
@@ -25,6 +23,8 @@ export default function ActiveRide() {
   const [showSafetySheet, setShowSafetySheet] = useState(false);
   const [showInstructions, setShowInstructions] = useState(true);
   const [loading, setLoading] = useState(true);
+  // Track real driver GPS coords for SOS
+  const liveLocationRef = useRef<{ latitude: number; longitude: number } | null>(null);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -71,11 +71,10 @@ export default function ActiveRide() {
   };
 
   const handleSOS = async () => {
+    const loc = liveLocationRef.current ?? { latitude: 12.9716, longitude: 77.5946 };
     try {
-      // Get current location (mocked or browser geolocation)
-      const location = { latitude: 19.076, longitude: 72.877 };
-      await driverSafetyApi.triggerSos(location, ride?.id);
-      toast.success('SOS Alert Sent! Help is on the way.');
+      await driverSafetyApi.triggerSos(loc, ride?.id);
+      toast.success('🚨 SOS Alert Sent! Help is on the way.');
       setShowSafetySheet(false);
     } catch (err: any) {
       toast.error(err.message || 'Failed to trigger SOS');
@@ -88,67 +87,20 @@ export default function ActiveRide() {
   return (
     <div className="fixed inset-0 z-50 bg-slate-900 flex flex-col font-sans">
       
-      {/* Real-time Map Background (Simulation) */}
+      {/* Real-time Map Background — live GPS via DriverTracking */}
       <div className="absolute inset-0 z-0">
-        <div className="w-full h-full bg-slate-800 relative overflow-hidden">
-          {/* Mock Map Grid */}
-          <div className="absolute inset-0 opacity-20" style={{ 
-            backgroundImage: 'radial-gradient(circle, #4f46e5 1px, transparent 1px)', 
-            backgroundSize: '40px 40px' 
-          }} />
-          
-          {/* Animated Route Line */}
-          <svg className="absolute inset-0 w-full h-full pointer-events-none">
-             <motion.path
-                d="M 100 600 Q 200 400 400 300 T 700 100"
-                fill="none"
-                stroke="#4f46e5"
-                strokeWidth="12"
-                strokeLinecap="round"
-                initial={{ pathLength: 0 }}
-                animate={{ pathLength: 1 }}
-                transition={{ duration: 2, ease: "easeInOut" }}
-             />
-             <motion.path
-                d="M 100 600 Q 200 400 400 300 T 700 100"
-                fill="none"
-                stroke="white"
-                strokeWidth="4"
-                strokeLinecap="round"
-                strokeDasharray="10 20"
-                animate={{ strokeDashoffset: -100 }}
-                transition={{ repeat: Infinity, duration: 10, ease: "linear" }}
-             />
-          </svg>
-
-          {/* Map Markers */}
-          <motion.div 
-            className="absolute top-[100px] right-[100px] z-10"
-            initial={{ scale: 0 }} animate={{ scale: 1 }}
-          >
-            <div className="bg-emerald-500 p-3 rounded-full shadow-2xl ring-4 ring-emerald-500/30">
-               <Flag className="w-6 h-6 text-white" />
-            </div>
-          </motion.div>
-
-          <motion.div 
-            className="absolute bottom-[200px] left-[150px] z-20 flex flex-col items-center"
-            animate={{ 
-              x: status === 'ONGOING' ? [0, 100, 200] : 0, 
-              y: status === 'ONGOING' ? [0, -50, -100] : 0 
-            }}
-            transition={{ duration: 20, repeat: Infinity }}
-          >
-            <div className="bg-white p-1 rounded-full shadow-2xl relative">
-              <div className="bg-indigo-600 p-4 rounded-full shadow-inner">
-                <Navigation className="w-8 h-8 text-white rotate-45" />
-              </div>
-              {/* Radar Effect */}
-              <div className="absolute inset-0 rounded-full border-4 border-indigo-500 animate-ping opacity-20" />
-            </div>
-            <Badge className="mt-4 bg-indigo-600 text-white font-bold px-4 py-1.5 shadow-xl border-none">YOU</Badge>
-          </motion.div>
-        </div>
+        <DriverTracking
+          rideId={ride?.id}
+          pickupLatitude={ride?.pickupLatitude}
+          pickupLongitude={ride?.pickupLongitude}
+          dropLatitude={ride?.dropLatitude}
+          dropLongitude={ride?.dropLongitude}
+          pickupLabel={ride?.pickupLocation}
+          dropLabel={ride?.dropLocation}
+          onLocationUpdate={(lat, lng) => {
+            liveLocationRef.current = { latitude: lat, longitude: lng };
+          }}
+        />
       </div>
 
       {/* Top Navigation Instructions */}

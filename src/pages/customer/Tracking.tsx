@@ -1,221 +1,356 @@
-import React, { useState, useEffect } from 'react';
+/**
+ * customer/Tracking.tsx
+ * Full real-time ride tracking page.
+ * - REST poll to bootstrap ride data
+ * - WebSocket (STOMP) subscription to /topic/ride/{rideId}/location for live updates
+ * - Leaflet map via LiveMap component
+ * - ETA dashboard via EtaDashboard component
+ * - SOS button triggers customer safety API
+ */
+
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  Navigation2, 
-  ChevronLeft, 
-  AlertCircle, 
-  CheckCircle2, 
-  Shield, 
-  Star, 
-  Phone, 
-  MessageCircle, 
-  Share2, 
-  X 
+import { motion } from 'framer-motion';
+import {
+  ChevronLeft,
+  Shield,
+  Phone,
+  MessageCircle,
+  Share2,
+  X,
 } from 'lucide-react';
+import { Client } from '@stomp/stompjs';
 import { Button, Badge } from '../../components/ui';
-import { customerRideApi, TokenStore } from '../../lib/api';
+import LiveMap, { LatLng } from '../../components/LiveMap';
+import EtaDashboard from '../../components/EtaDashboard';
+import { customerRideApi, customerSafetyApi, rideTrackingApi } from '../../lib/api';
 import { toast } from 'react-hot-toast';
 
+interface TrackingState {
+  driverPosition: LatLng | null;
+  etaMinutes: number | null;
+  etaText: string | null;
+  distanceKm: number | null;
+  distanceText: string | null;
+  routePoints: LatLng[];
+  status: string;
+  isLive: boolean;
+}
+
 export default function RideTracking() {
+  const navigate = useNavigate();
   const [ride, setRide] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const navigate = useNavigate();
+  const [tracking, setTracking] = useState<TrackingState>({
+    driverPosition: null,
+    etaMinutes: null,
+    etaText: null,
+    distanceKm: null,
+    distanceText: null,
+    routePoints: [],
+    status: 'SEARCHING',
+    isLive: false,
+  });
 
-  const fetchActiveRide = async () => {
+  const stompRef = useRef<Client | null>(null);
+  const rideIdRef = useRef<string | null>(null);
+
+  // ── Fetch active ride (bootstrap) ──────────────────────────────────────────
+  const fetchRide = useCallback(async () => {
     try {
       const res = await customerRideApi.getActive();
-      setRide(res.data);
-      if (res.data.status === 'COMPLETED') {
-        toast.success('Ride completed! Hope you had a great trip.');
+      const data = res.data;
+      setRide(data);
+
+      if (data?.status === 'COMPLETED') {
+        toast.success('Ride completed! Hope you had a great trip. 🎉');
         navigate('/customer');
+        return;
+      }
+
+      // Update base tracking state from ride
+      setTracking((prev) => ({
+        ...prev,
+        status: data?.status ?? 'SEARCHING',
+      }));
+
+      rideIdRef.current = data?.id ?? null;
+
+      // Also fetch the RideTracking doc if ride ID is known
+      if (data?.id) {
+        fetchTrackingDoc(data.id);
       }
     } catch (err) {
       console.error('Failed to fetch active ride', err);
     } finally {
       setLoading(false);
     }
+  }, [navigate]);
+
+  // ── Fetch RideTracking document from backend ───────────────────────────────
+  const fetchTrackingDoc = async (rideId: string) => {
+    try {
+      const res = await rideTrackingApi.getTracking(rideId);
+      const doc = res.data;
+      if (!doc) return;
+
+      setTracking((prev) => ({
+        ...prev,
+        driverPosition:
+          doc.driverLatitude && doc.driverLongitude
+            ? { lat: doc.driverLatitude, lng: doc.driverLongitude }
+            : prev.driverPosition,
+        etaMinutes: doc.etaMinutes ?? prev.etaMinutes,
+        distanceKm: doc.distanceKm ?? prev.distanceKm,
+        routePoints: Array.isArray(doc.routePoints) ? doc.routePoints : prev.routePoints,
+        status: doc.status ?? prev.status,
+      }));
+    } catch {
+      // Tracking doc may not exist yet if ride is still SEARCHING
+    }
   };
 
+  // ── Initial load + polling fallback every 8 s ──────────────────────────────
   useEffect(() => {
-    fetchActiveRide();
-    const interval = setInterval(fetchActiveRide, 5000);
+    fetchRide();
+    const interval = setInterval(fetchRide, 8000);
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchRide]);
 
+  // ── WebSocket subscription once rideId is known ────────────────────────────
+  useEffect(() => {
+    if (!ride?.id) return;
+    if (stompRef.current) return; // Already connected
+
+    const wsProto = window.location.protocol === 'https:' ? 'wss' : 'ws';
+    const brokerUrl = `${wsProto}://${window.location.hostname}:8080/api/ws`;
+
+    const client = new Client({
+      brokerURL: brokerUrl,
+      reconnectDelay: 5000,
+      heartbeatIncoming: 4000,
+      heartbeatOutgoing: 4000,
+    });
+
+    client.onConnect = () => {
+      console.log('[Tracking] STOMP connected');
+      setTracking((prev) => ({ ...prev, isLive: true }));
+
+      // Per-ride location topic
+      client.subscribe(`/topic/ride/${ride.id}/location`, (msg) => {
+        const payload = JSON.parse(msg.body);
+        setTracking((prev) => ({
+          ...prev,
+          driverPosition: { lat: payload.latitude, lng: payload.longitude },
+          etaMinutes: payload.etaMinutes ?? prev.etaMinutes,
+          etaText: payload.etaText ?? prev.etaText,
+          distanceKm: payload.distanceKm ?? prev.distanceKm,
+          distanceText: payload.distanceText ?? prev.distanceText,
+          status: payload.status ?? prev.status,
+          isLive: true,
+        }));
+      });
+    };
+
+    client.onDisconnect = () => {
+      setTracking((prev) => ({ ...prev, isLive: false }));
+    };
+
+    client.activate();
+    stompRef.current = client;
+
+    return () => {
+      client.deactivate();
+      stompRef.current = null;
+    };
+  }, [ride?.id]);
+
+  // ── Cancel ride ────────────────────────────────────────────────────────────
   const handleCancel = async () => {
     if (!ride?.id) return;
     try {
       await customerRideApi.cancel(ride.id);
       toast.success('Ride cancelled');
       navigate('/customer');
-    } catch (err) {
+    } catch {
       toast.error('Failed to cancel ride');
     }
   };
 
-  const status = ride?.status?.toLowerCase() || 'searching';
+  // ── SOS ────────────────────────────────────────────────────────────────────
+  const handleSos = async () => {
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          await customerSafetyApi.triggerSos({
+            rideId: ride?.id,
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+          });
+          toast.error('🚨 SOS Alert sent to emergency contacts!', {
+            duration: 6000,
+            style: { background: '#ef4444', color: '#fff', fontWeight: 700 },
+          });
+        } catch {
+          toast.error('Failed to send SOS. Call 112 directly.');
+        }
+      },
+      () => toast.error('Location access required for SOS.'),
+    );
+  };
+
+  // ── Map props ──────────────────────────────────────────────────────────────
+  const pickupPosition: LatLng | null =
+    ride?.pickupLatitude && ride?.pickupLongitude
+      ? { lat: ride.pickupLatitude, lng: ride.pickupLongitude }
+      : null;
+
+  const dropPosition: LatLng | null =
+    ride?.dropLatitude && ride?.dropLongitude
+      ? { lat: ride.dropLatitude, lng: ride.dropLongitude }
+      : null;
+
+  const mapCenter: LatLng =
+    tracking.driverPosition ??
+    pickupPosition ?? { lat: 12.9716, lng: 77.5946 };
+
+  // ── Render ─────────────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-16 h-16 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+          <p className="text-slate-400 font-bold uppercase tracking-widest text-sm">
+            Loading ride…
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-slate-100 dark:bg-slate-950 flex flex-col relative overflow-hidden">
-      
-      {/* Background Simulation Map */}
-      <div className="absolute inset-0 z-0 bg-slate-200 dark:bg-slate-900">
-         <div className="absolute inset-0 opacity-20 pointer-events-none">
-            <div className="w-full h-full" style={{ backgroundImage: 'radial-gradient(#6366f1 1px, transparent 0)', backgroundSize: '40px 40px' }} />
-         </div>
-         
-         {/* Animated Markers */}
-         <motion.div 
-            animate={{ 
-               x: status === 'searching' ? [100, 200, 150] : 300,
-               y: status === 'searching' ? [100, 150, 120] : 350
-            }}
-            className="absolute top-0 left-0 w-12 h-12 flex items-center justify-center z-10"
-         >
-            <div className="relative">
-               <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center text-white shadow-xl shadow-indigo-500/50 ring-4 ring-white dark:ring-slate-800">
-                  <Navigation2 className="w-4 h-4 fill-current rotate-45" />
-               </div>
-               <div className="absolute inset-0 bg-indigo-500 rounded-full animate-ping opacity-40 -z-10" />
-            </div>
-         </motion.div>
-
-         <div className="absolute top-[40%] left-[30%] w-6 h-6 bg-emerald-500 rounded-full border-4 border-white dark:border-slate-800 shadow-xl shadow-emerald-500/50">
-            <div className="absolute -top-10 left-1/2 -translate-x-1/2 bg-white dark:bg-slate-800 px-3 py-1 rounded-full shadow-lg border border-slate-100 dark:border-slate-700 whitespace-nowrap">
-               <span className="text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white">Pickup Point</span>
-            </div>
-         </div>
+    <div className="min-h-screen bg-slate-950 flex flex-col relative overflow-hidden">
+      {/* ── Map fills the background ──────────────────────────────────────── */}
+      <div className="absolute inset-0 z-0">
+        <LiveMap
+          className="w-full h-full"
+          center={mapCenter}
+          zoom={14}
+          driverPosition={tracking.driverPosition}
+          pickupPosition={pickupPosition}
+          dropPosition={dropPosition}
+          routePoints={tracking.routePoints}
+          pickupLabel={ride?.pickupLocation ?? 'Pickup'}
+          dropLabel={ride?.dropLocation ?? 'Drop'}
+        />
+        {/* Dark gradient overlay so bottom panel is readable */}
+        <div className="absolute bottom-0 left-0 right-0 h-2/3 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent pointer-events-none" />
       </div>
 
-      {/* Floating Header */}
-      <div className="relative z-10 p-6 flex items-center justify-between pointer-events-none">
-         <Button 
-            variant="white"
-            size="icon" 
-            onClick={() => navigate('/customer')}
-            className="rounded-2xl pointer-events-auto shadow-xl"
+      {/* ── Top Controls ─────────────────────────────────────────────────── */}
+      <div className="relative z-10 p-5 flex items-center justify-between pointer-events-none">
+        <Button
+          variant="white"
+          size="icon"
+          onClick={() => navigate('/customer')}
+          className="rounded-2xl pointer-events-auto shadow-2xl backdrop-blur-md bg-white/90"
+        >
+          <ChevronLeft className="w-6 h-6" />
+        </Button>
+
+        {tracking.isLive && (
+          <Badge className="pointer-events-auto bg-emerald-500 text-white border-none px-4 py-2 rounded-full font-black text-[10px] uppercase tracking-widest flex items-center gap-2">
+            <span className="w-2 h-2 bg-white rounded-full animate-ping" />
+            Live Tracking
+          </Badge>
+        )}
+
+        <Button
+          variant="destructive"
+          size="icon"
+          onClick={handleSos}
+          className="rounded-2xl pointer-events-auto shadow-2xl bg-red-600 hover:bg-red-700"
+          title="SOS Emergency"
+        >
+          <Shield className="w-5 h-5" />
+        </Button>
+      </div>
+
+      {/* ── Bottom Info Panel ─────────────────────────────────────────────── */}
+      <div className="mt-auto relative z-10 p-5 space-y-4">
+        {/* ETA Dashboard */}
+        <EtaDashboard
+          status={tracking.status}
+          etaMinutes={tracking.etaMinutes}
+          etaText={tracking.etaText}
+          distanceKm={tracking.distanceKm}
+          distanceText={tracking.distanceText}
+          driverName={ride?.driver?.name}
+          vehicleModel={ride?.driver ? `${ride.driver.vehicleColor ?? ''} ${ride.driver.vehicleModel ?? ''}`.trim() : undefined}
+          vehicleNumber={ride?.driver?.vehicleNumber}
+          rating={ride?.driver?.rating}
+          fare={ride?.fare}
+          isLive={tracking.isLive}
+        />
+
+        {/* Action Buttons */}
+        <motion.div
+          className="grid grid-cols-3 gap-3"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <Button
+            className="py-5 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white border-none shadow-lg flex flex-col items-center gap-1"
+            disabled={!ride?.driver?.phone}
           >
-            <ChevronLeft className="w-6 h-6" />
-         </Button>
-         
-         <div className="pointer-events-auto">
-            <Badge variant="outline" className="bg-white/90 dark:bg-slate-900/90 backdrop-blur-md text-slate-900 dark:text-white px-4 py-2 border-none shadow-xl font-bold uppercase tracking-widest text-[10px]">
-               {status === 'searching' && <span className="animate-pulse flex items-center gap-2 text-indigo-600"><AlertCircle className="w-3 h-3" /> Finding Captain...</span>}
-               {status === 'driver_assigned' && <span className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-500" /> Captain Assigned</span>}
-               {status === 'driver_arriving' && <span className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-500" /> Arriving Shortly</span>}
-               {status === 'ongoing' && <span className="flex items-center gap-2 text-amber-500">Ride In Progress</span>}
-            </Badge>
-         </div>
+            <Phone className="w-5 h-5" />
+            <span className="text-[9px] font-black uppercase tracking-widest">Call</span>
+          </Button>
 
-         <Button 
-            variant="destructive"
-            size="icon" 
-            className="rounded-2xl pointer-events-auto shadow-xl"
+          <Button className="py-5 rounded-2xl bg-slate-800/80 border border-slate-700 text-white hover:bg-slate-700 flex flex-col items-center gap-1 backdrop-blur-md">
+            <MessageCircle className="w-5 h-5" />
+            <span className="text-[9px] font-black uppercase tracking-widest">Message</span>
+          </Button>
+
+          <Button
+            onClick={handleCancel}
+            className="py-5 rounded-2xl bg-red-500/20 border border-red-500/40 text-red-400 hover:bg-red-500/30 flex flex-col items-center gap-1"
           >
-            <Shield className="w-6 h-6" />
-         </Button>
+            <X className="w-5 h-5" />
+            <span className="text-[9px] font-black uppercase tracking-widest">Cancel</span>
+          </Button>
+        </motion.div>
+
+        {/* Route Summary */}
+        {(ride?.pickupLocation || ride?.dropLocation) && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            className="bg-white/5 backdrop-blur-md border border-white/10 rounded-2xl p-4 space-y-2"
+          >
+            <div className="flex items-start gap-3">
+              <div className="mt-1 w-2.5 h-2.5 rounded-full bg-indigo-500 ring-2 ring-indigo-400/30 shrink-0" />
+              <p className="text-xs font-semibold text-slate-300 line-clamp-1">
+                {ride.pickupLocation}
+              </p>
+            </div>
+            <div className="ml-[5px] w-px h-5 bg-slate-600" />
+            <div className="flex items-start gap-3">
+              <div className="mt-1 w-2.5 h-2.5 rounded-full bg-rose-500 ring-2 ring-rose-400/30 shrink-0" />
+              <p className="text-xs font-semibold text-slate-300 line-clamp-1">
+                {ride.dropLocation}
+              </p>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Share Trip */}
+        <Button className="w-full py-4 rounded-2xl bg-white/5 border border-white/10 text-white hover:bg-white/10 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest backdrop-blur-md">
+          <Share2 className="w-4 h-4" />
+          Share Live Trip
+        </Button>
       </div>
-
-      {/* Content Panels */}
-      <div className="mt-auto relative z-10 p-6 space-y-4">
-         <AnimatePresence mode="wait">
-            {status === 'searching' || !ride?.driver ? (
-               <motion.div
-                  key="searching"
-                  initial={{ opacity: 0, y: 50 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 50 }}
-                  className="bg-white dark:bg-slate-900 rounded-[3rem] p-8 shadow-2xl text-center space-y-6"
-               >
-                  <div className="relative w-24 h-24 mx-auto">
-                     <div className="absolute inset-0 bg-indigo-500/10 rounded-full animate-ping" />
-                     <div className="relative w-full h-full bg-indigo-50 dark:bg-indigo-900/20 rounded-full flex items-center justify-center text-indigo-600">
-                        <Navigation2 className="w-10 h-10 animate-bounce" />
-                     </div>
-                  </div>
-                  <div>
-                     <h2 className="text-2xl font-black uppercase tracking-tighter italic">Searching Nearby</h2>
-                     <p className="text-sm font-bold text-slate-400 uppercase tracking-widest mt-1">Connecting with the perfect captain...</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                     <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-800">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ride Mode</p>
-                        <p className="font-bold text-slate-900 dark:text-white uppercase tracking-tight italic">{ride?.vehicleCategory || 'Vazraa Mini'}</p>
-                     </div>
-                     <div className="p-4 bg-slate-50 dark:bg-slate-800 rounded-3xl border border-slate-100 dark:border-slate-800">
-                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Fixed Fare</p>
-                        <p className="font-bold text-slate-900 dark:text-white uppercase tracking-tight italic">₹{ride?.fare?.toFixed(0) || '0'}</p>
-                     </div>
-                  </div>
-                  <Button onClick={handleCancel} variant="ghost" className="w-full py-4 text-red-500 font-black uppercase tracking-widest text-xs">Cancel Search</Button>
-               </motion.div>
-            ) : (
-               <motion.div
-                  key="driver-details"
-                  initial={{ opacity: 0, scale: 0.9, y: 50 }}
-                  animate={{ opacity: 1, scale: 1, y: 0 }}
-                  className="space-y-4"
-               >
-                  {/* Driver Header Card */}
-                  <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] p-6 shadow-2xl space-y-6 relative overflow-hidden group">
-                     {/* Background Glow */}
-                     <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-indigo-500/10 transition-all" />
-
-                     <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                           <div className="relative">
-                              <div className="w-16 h-16 rounded-[1.5rem] bg-indigo-600 flex items-center justify-center text-white text-2xl font-black italic shadow-lg">
-                                 {ride.driver.name.charAt(0)}
-                              </div>
-                              <div className="absolute -bottom-1 -right-1 bg-indigo-600 text-white p-1 rounded-full border-2 border-white dark:border-slate-900">
-                                 <Star className="w-3 h-3 fill-current" />
-                              </div>
-                           </div>
-                           <div>
-                              <h3 className="text-xl font-black uppercase tracking-tighter italic leading-none">{ride.driver.name}</h3>
-                              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mt-1">{ride.driver.vehicleColor} {ride.driver.vehicleModel}</p>
-                              <div className="flex items-center gap-2 mt-1">
-                                 <Badge className="bg-amber-100 text-amber-600 border-none px-1.5 font-bold">{ride.driver.rating?.toFixed(1) || '5.0'} ★</Badge>
-                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{ride.driver.totalRides || '0'} Rides</span>
-                              </div>
-                           </div>
-                        </div>
-                        <div className="text-right">
-                           <Badge className="bg-indigo-600 text-white rounded-xl py-2 px-3 font-black text-xs border-none shadow-lg uppercase">{ride.driver.vehicleNumber}</Badge>
-                           <p className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest mt-2">Active Now</p>
-                        </div>
-                     </div>
-
-                     <div className="grid grid-cols-2 gap-3">
-                        <Button className="py-6 rounded-2xl bg-emerald-500 hover:bg-emerald-600 text-white border-none shadow-emerald-100 dark:shadow-none flex items-center gap-2 font-black uppercase tracking-widest text-xs">
-                           <Phone className="w-4 h-4" />
-                           Call
-                        </Button>
-                        <Button className="py-6 rounded-2xl bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-400 border-none hover:bg-indigo-100 flex items-center gap-2 font-black uppercase tracking-widest text-xs">
-                           <MessageCircle className="w-4 h-4" />
-                           Message
-                        </Button>
-                     </div>
-                  </div>
-
-                  {/* Secondary Actions */}
-                  <div className="flex gap-3">
-                     <Button className="flex-1 py-4 px-6 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xl flex items-center justify-between text-slate-900 dark:text-white font-bold text-sm h-auto group">
-                        <div className="flex items-center gap-3">
-                           <Share2 className="w-5 h-5 text-indigo-500 group-hover:scale-110 transition-transform" />
-                           <span className="uppercase tracking-tight">Share Trip</span>
-                        </div>
-                     </Button>
-                     <Button onClick={handleCancel} className="py-4 px-6 bg-red-50 dark:bg-red-900/10 rounded-2xl border border-red-100 dark:border-red-900/20 shadow-xl flex items-center justify-center text-red-500 font-bold group h-auto">
-                        <X className="w-6 h-6 group-hover:rotate-90 transition-transform" />
-                     </Button>
-                  </div>
-               </motion.div>
-            )}
-         </AnimatePresence>
-      </div>
-
     </div>
   );
 }
