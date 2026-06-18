@@ -76,7 +76,7 @@ public class RideBookingService {
                 .vehicleCategory(request.getVehicleCategory())
                 .status(RideStatus.SEARCHING)
                 .distance(distance)
-                .duration(route.durationMinutes())
+                .duration((double) route.durationMinutes())
                 .estimatedFare(fare)
                 .fare(fare)
                 .paymentMethod(request.getPaymentMethod())

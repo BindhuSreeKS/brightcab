@@ -147,7 +147,7 @@ public class WhatsAppService {
     private void post(Map<String, Object> payload) {
         try {
             String json = objectMapper.writeValueAsString(payload);
-            log.debug("AiSensy outbound → {} : {}", payload.get("destination"), json);
+            log.debug("AiSensy outbound -> {}", payload.get("destination"));
             Request request = new Request.Builder()
                     .url(apiUrl)
                     .addHeader("Content-Type", "application/json")

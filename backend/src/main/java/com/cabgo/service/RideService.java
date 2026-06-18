@@ -102,7 +102,7 @@ public class RideService {
                 .driverName(r.getDriverName()).pickupLocation(r.getPickupLocation())
                 .dropLocation(r.getDropLocation()).status(r.getStatus())
                 .vehicleCategory(r.getVehicleCategory()).fare(r.getFare())
-                .distance(r.getDistance()).duration(r.getDuration())
+                .distance(r.getDistance()).duration(r.getDuration() != null ? r.getDuration().intValue() : null)
                 .paymentMethod(r.getPaymentMethod()).cityId(r.getCityId())
                 .cancellationReason(r.getCancellationReason()).cancelledBy(r.getCancelledBy())
                 .requestedAt(r.getRequestedAt()).completedAt(r.getCompletedAt())

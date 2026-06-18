@@ -335,7 +335,7 @@ public class ChatSessionService {
         fare = Math.round(fare * 100.0) / 100.0;
 
         session.setTempDistance(result.distanceKm());
-        session.setTempDuration(result.durationMinutes());
+        session.setTempDuration((double) result.durationMinutes());
         session.setTempFare(fare);
 
         // Ask customer to pick a car type before showing final fare
@@ -1136,7 +1136,7 @@ public class ChatSessionService {
         estFare = Math.round(estFare * 100.0) / 100.0;
 
         session.setTempDistance(result.distanceKm());
-        session.setTempDuration(result.durationMinutes());
+        session.setTempDuration((double) result.durationMinutes());
         session.setTempFare(estFare);
 
         session.setState(ConversationState.FARE_EST_VEHICLE);

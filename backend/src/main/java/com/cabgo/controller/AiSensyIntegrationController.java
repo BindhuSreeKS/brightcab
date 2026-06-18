@@ -157,7 +157,7 @@ public class AiSensyIntegrationController {
                 .vehicleCategory(category)
                 .status(RideStatus.SEARCHING)
                 .distance(route.distanceKm())
-                .duration(route.durationMinutes())
+                .duration((double) route.durationMinutes())
                 .estimatedFare(fare)
                 .fare(fare)
                 .paymentMethod(PaymentMethod.CASH)
