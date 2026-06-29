@@ -6,6 +6,7 @@ import {
   Globe, DollarSign, Megaphone, History, ChevronRight,
   Menu, LogOut, Search, User as UserIcon, Sun, Moon, Loader2, MessageSquare, Zap
 } from 'lucide-react';
+
 import { cn } from '../lib/utils';
 import { Button } from './ui';
 import { useTheme } from '../contexts/ThemeContext';
@@ -56,6 +57,7 @@ const SUPER_ADMIN_NAV_ITEMS: NavItem[] = [
   { label: 'Pricing & Commission', href: '/super-admin/pricing', icon: DollarSign },
   { label: 'Fare Surge Zones', href: '/super-admin/fare-zones', icon: Zap },
   { label: 'Promotions', href: '/super-admin/promotions', icon: Megaphone },
+
   { label: 'Revenue & Analytics', href: '/super-admin/analytics', icon: PieChart },
   { label: 'Audit Logs', href: '/super-admin/audit', icon: History },
   { label: 'Security Monitoring', href: '/super-admin/security', icon: AlertCircle },

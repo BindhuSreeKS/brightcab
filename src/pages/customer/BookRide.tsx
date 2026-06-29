@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Button, Badge, Card } from '../../components/ui';
 import { customerRideApi, fareApi, TokenStore } from '../../lib/api';
+
 import { toast } from 'react-hot-toast';
 import 'leaflet/dist/leaflet.css';
 
@@ -27,6 +28,7 @@ const CAR_CATEGORIES: Record<string, { capacity: number; label: string; desc: st
   SUV:      { capacity: 6, label: 'SUV',     desc: 'Spacious family ride' },
   AUTO:     { capacity: 3, label: 'Auto',    desc: 'Affordable three-wheeler' }
 };
+
 
 // Mock fallback fares when backend is offline
 const MOCK_FARES = [
@@ -279,6 +281,7 @@ export default function BookRide() {
         traffic: 'MEDIUM',
         breakdown: { base: 50, distance: 100, time: 20, traffic: 1.05, demand: 1.0 }
       })));
+
       setSelectedRide(MOCK_FARES[0].category);
       setStep(2);
     } finally {
@@ -286,11 +289,13 @@ export default function BookRide() {
     }
   };
 
+
   useEffect(() => {
     if (step === 2) {
       fetchEstimates();
     }
   }, [pickupCoords, dropCoords]);
+
 
   const handleBook = async () => {
     setLoading(true);
@@ -449,6 +454,7 @@ export default function BookRide() {
                         onClick={() => setSelectedRide(ride.category)}
                         className={cn(
                           "p-5 rounded-[2.5rem] border-2 transition-all cursor-pointer flex flex-col items-stretch",
+
                           isSelected
                             ? "bg-indigo-50 dark:bg-indigo-900/10 border-indigo-500 shadow-xl shadow-indigo-100 dark:shadow-none" 
                             : "bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 hover:border-indigo-300"

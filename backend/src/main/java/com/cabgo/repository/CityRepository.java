@@ -19,3 +19,4 @@ public interface CityRepository extends MongoRepository<City, String> {
 
     java.util.Optional<City> findByNameIgnoreCase(String name);
 }
+

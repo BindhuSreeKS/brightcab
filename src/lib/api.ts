@@ -438,6 +438,7 @@ export const fareApi = {
   }) => apiFetch<any>('/fares/estimate', { method: 'POST', body: JSON.stringify(payload) })
 };
 
+
 // ─── Customer Wallet API ────────────────────────────────────────────────────
 export const customerWalletApi = {
   getBalance: () => apiFetch<number>('/customer/wallet/balance'),
@@ -498,8 +499,6 @@ export const driverLocationApi = {
       body: JSON.stringify(payload),
     }),
 };
-
-// ─── Fare Zones API (super-admin: destinations & festivals) ──────────────────
 export const fareZonesApi = {
   // Popular Destinations
   getDestinations: (city?: string) =>
@@ -523,4 +522,3 @@ export const fareZonesApi = {
   deleteFestival: (id: string) =>
     apiFetch<void>(`/fare-zones/festivals/${id}`, { method: 'DELETE' }),
 };
-

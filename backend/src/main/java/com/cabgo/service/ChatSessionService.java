@@ -399,6 +399,7 @@ public class ChatSessionService {
             log.warn("FareService recalc failed for vehicle {}: {}", chosen.name(), ex.getMessage());
             fare = session.getTempFare() != null ? session.getTempFare() : 0.0;
         }
+
         session.setState(ConversationState.AWAITING_CONFIRMATION);
 
         String fareMsg = String.format(
@@ -1154,6 +1155,7 @@ public class ChatSessionService {
             return;
         }
 
+<<<<<<< HEAD
         // Calculate distance & fare using FareService (SEDAN as initial estimate)
         FareRequest initReq = FareRequest.builder()
             .pickupLat(session.getTempPickupLat())
@@ -1177,6 +1179,19 @@ public class ChatSessionService {
             session.setTempDuration((double) fallback.durationMinutes());
             session.setTempFare(50.0 + fallback.distanceKm() * 12.0);
         }
+=======
+        // Calculate distance & estimated fare
+        GoogleMapsService.DistanceResult result = mapsService.getDistance(
+            session.getTempPickupLat(), session.getTempPickupLng(),
+            session.getTempDropLat(), session.getTempDropLng()
+        );
+        double estFare = baseFare + (result.distanceKm() * perKm) + (result.durationMinutes() * perMinute);
+        estFare = Math.round(estFare * 100.0) / 100.0;
+
+        session.setTempDistance(result.distanceKm());
+        session.setTempDuration((double) result.durationMinutes());
+        session.setTempFare(estFare);
+>>>>>>> e0477018561cd0a5a81656674f0fd5ddb0064559
 
         session.setState(ConversationState.FARE_EST_VEHICLE);
         whatsAppService.sendText(session.getWhatsappPhone(),
@@ -1194,17 +1209,26 @@ public class ChatSessionService {
         VehicleCategory chosen;
         String label;
         switch (input) {
+<<<<<<< HEAD
             case "1", "mini"      -> { chosen = VehicleCategory.MINI;      label = "Mini"; }
             case "2", "hatchback" -> { chosen = VehicleCategory.HATCHBACK; label = "Hatchback"; }
             case "3", "sedan"     -> { chosen = VehicleCategory.SEDAN;     label = "Sedan"; }
             case "4", "suv"       -> { chosen = VehicleCategory.SUV;       label = "SUV"; }
             case "5", "luxury"    -> { chosen = VehicleCategory.LUXURY;    label = "Luxury"; }
+=======
+            case "1", "mini" -> { chosen = VehicleCategory.MINI; label = "MINI"; }
+            case "2", "hatchback" -> { chosen = VehicleCategory.HATCHBACK; label = "HATCHBACK"; }
+            case "3", "sedan" -> { chosen = VehicleCategory.SEDAN; label = "SEDAN"; }
+            case "4", "suv" -> { chosen = VehicleCategory.SUV; label = "SUV"; }
+            case "5", "luxury" -> { chosen = VehicleCategory.LUXURY; label = "LUXURY"; }
+>>>>>>> e0477018561cd0a5a81656674f0fd5ddb0064559
             default -> {
                 whatsAppService.sendText(session.getWhatsappPhone(), "❌ Invalid selection. Please reply 1-5.");
                 return;
             }
         }
 
+<<<<<<< HEAD
         // Use FareService for dynamic, city-aware, traffic-aware estimation
         double fare;
         double distance = session.getTempDistance() != null ? session.getTempDistance() : 0.0;
@@ -1243,6 +1267,41 @@ public class ChatSessionService {
             label,
             session.getTempPickupAddress(), session.getTempDropAddress(),
             distance, duration, trafficInfo, fare
+=======
+        double rate = switch (chosen) {
+            case MINI -> 10.0;
+            case HATCHBACK -> 11.0;
+            case SEDAN -> 15.0;
+            case SUV -> 20.0;
+            case LUXURY -> 25.0;
+            default -> 12.0;
+        };
+
+        double base = switch (chosen) {
+            case MINI -> 40.0;
+            case HATCHBACK -> 45.0;
+            case SEDAN -> 80.0;
+            case SUV -> 120.0;
+            case LUXURY -> 150.0;
+            default -> 50.0;
+        };
+
+        double distance = session.getTempDistance() != null ? session.getTempDistance() : 0.0;
+        double fare = base + (distance * rate);
+        fare = Math.round(fare * 100.0) / 100.0;
+
+        String resultMsg = String.format(
+            "💰 *Fare Estimate Result*\n\n" +
+            "📍 Pickup: %s\n" +
+            "🎯 Drop: %s\n" +
+            "🚗 Vehicle: *%s*\n\n" +
+            "📏 Distance: %.1f km\n" +
+            "⏱ Duration: %.0f mins\n\n" +
+            "💵 *Estimated Fare: ₹%.0f*\n\n" +
+            "Type *menu* to go back.",
+            session.getTempPickupAddress(), session.getTempDropAddress(), label,
+            distance, session.getTempDuration() != null ? session.getTempDuration() : 0.0, fare
+>>>>>>> e0477018561cd0a5a81656674f0fd5ddb0064559
         );
 
         session.setState(ConversationState.MAIN_MENU);
