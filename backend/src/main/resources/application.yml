@@ -1,0 +1,79 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: cabgo-admin-backend
+
+  data:
+    mongodb:
+      uri: ${MONGODB_URI:mongodb://localhost:27017/cabgo_admin}
+      database: ${MONGODB_DATABASE:cabgo_admin}
+
+  jackson:
+    date-format: yyyy-MM-dd'T'HH:mm:ss
+    time-zone: Asia/Kolkata
+    default-property-inclusion: non_null
+    serialization:
+      write-dates-as-timestamps: false
+
+# JWT Configuration
+jwt:
+  secret: ${JWT_SECRET:cabgo-super-secret-key-2024-production-ready-minimum-256-bits-long}
+  expiration: ${JWT_EXPIRATION:86400000}        # 24 hours in milliseconds
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}  # 7 days in milliseconds
+
+# CORS
+cors:
+  allowed-origins: ${CORS_ORIGINS:http://localhost:5173,http://localhost:3000,http://localhost:4173}
+  allowed-methods: GET,POST,PUT,DELETE,PATCH,OPTIONS
+  allowed-headers: "*"
+  allow-credentials: true
+  max-age: 3600
+
+# Logging
+logging:
+  level:
+    com.cabgo: DEBUG
+    org.springframework.security: INFO
+    org.springframework.data.mongodb: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+
+# Actuator
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: always
+
+# ── WhatsApp API (AiSensy via bgsinfotech reseller) ───────────────────────────
+aisensy:
+  api-key:          ${AISENSY_API_KEY:b712de2d74a1e7a3692c0}
+  project-api-key:  ${AISENSY_API_KEY:b712de2d74a1e7a3692c0}
+  campaign-name:    ${AISENSY_CAMPAIGN_NAME:Vazra mobility}
+  user-name:        ${AISENSY_USER_NAME:Vazra mobility}
+  whatsapp-number:  ${AISENSY_WHATSAPP_NUMBER:919035999800}
+  webhook-url:      ${AISENSY_WEBHOOK_URL:https://localhost:8080/api/webhook/whatsapp}
+  message-api-url:  ${AISENSY_MESSAGE_API_URL:https://messages.bgsinfotech.com/messages/whatsapp}
+
+# ── Google Maps API ────────────────────────────────────────────────────────────
+google:
+  maps:
+    api-key: ${GOOGLE_MAPS_API_KEY:YOUR_GOOGLE_MAPS_API_KEY}
+  gemini:
+    api-key: ${GEMINI_API_KEY:YOUR_GEMINI_API_KEY}
+
+# ── Cab Fare & Matching Config ─────────────────────────────────────────────────
+cab:
+  fare:
+    base: 50.0
+    per-km: 12.0
+    per-minute: 1.0
+  matching:
+    radius-km: 10.0

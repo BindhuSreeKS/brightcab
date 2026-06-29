@@ -1,0 +1,22 @@
+node_modules/
+build/
+dist/
+coverage/
+.DS_Store
+*.log
+.env*
+!.env.example
+
+# MongoDB local database files
+backend/data/db/
+
+# Java Maven/Spring Boot build files
+backend/target/
+backend/.mvn/
+backend/**/*.class
+backend/bin/
+backend/.classpath
+backend/.project
+backend/.settings/
+backend/tmp/
+
